@@ -1,240 +1,420 @@
-# Smart Manufacturing ERP
+# ForgeFlow — Smart Manufacturing Management
 
-Full-stack enterprise ERP system built with React + Node.js + MongoDB Atlas.
+> **Smart Manufacturing ERP** · Full-stack Enterprise Resource Planning system for digital manufacturing operations management.
+
+![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933?logo=node.js&logoColor=white)
+![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?logo=vite&logoColor=white)
+
+---
+
+## Overview
+
+**ForgeFlow** is a full-stack Smart Manufacturing ERP built to manage every stage of a manufacturing operation from a single web interface. The system covers production, supply chain, inventory, quality control, HR, and business intelligence — all backed by a secure REST API and persisted in MongoDB.
+
+The project demonstrates a complete modern ERP architecture: a React + TypeScript single-page application communicating with a Node.js / Express REST API, secured by JWT authentication with email OTP verification, and connected to MongoDB Atlas for persistent storage.
+
+---
+
+## Key Features
+
+### Manufacturing
+| Module | Description |
+|---|---|
+| **Manufacturing Orders** | Create, track, and manage production orders from planned to completed |
+| **Work Orders** | Individual work order lifecycle — planned, in-progress, on-hold, completed |
+| **Bill of Materials** | Multi-level BOM with component lists, quantities, and version management |
+| **Production Planning** | Schedule production runs, assign shifts, and link work orders |
+| **Machines** | Machine registry, status tracking, capacity and OEE target management |
+
+### Inventory & Warehouse
+| Module | Description |
+|---|---|
+| **Products** | Full product catalogue with SKU, pricing, categories, and reorder levels |
+| **Inventory** | Real-time stock levels, adjustments, transfers, and transaction log |
+| **Warehouse** | Multi-warehouse management with zone, capacity, and manager tracking |
+
+### Supply Chain & Sales
+| Module | Description |
+|---|---|
+| **Suppliers** | Supplier registry with ratings, payment terms, and lead times |
+| **Purchase** | Purchase order creation, line items, status tracking, and delivery |
+| **Orders** | Sales order management with customer linking and fulfilment status |
+| **Customers** | Customer master with credit limits, payment terms, and contact info |
+
+### Operations & Quality
+| Module | Description |
+|---|---|
+| **Quality Control** | Batch inspections, defect rate tracking, pass/fail recording |
+| **Maintenance** | Preventive and corrective maintenance scheduling with asset tracking |
+
+### HR & Attendance
+| Module | Description |
+|---|---|
+| **Employees** | Employee directory with department, position, shift, and status |
+| **Attendance** | Daily attendance marking with shift, actual in/out, hours, and overtime |
+
+### Intelligence & System
+| Module | Description |
+|---|---|
+| **Dashboard** | Live KPI cards, machine utilisation, production trend, quick actions |
+| **Analytics** | Month-to-date KPIs, QC by production line, order status distribution, CSV export |
+| **Reports** | Generate and store production, financial, inventory, and HR reports |
+| **Notifications** | System notification feed with mark-read and delete |
+| **Settings** | Configurable system settings with role-based access |
+| **User Management** | User accounts, role assignment, and active/inactive status |
+
+### Authentication
+| Feature | Implementation |
+|---|---|
+| Email OTP login | 6-digit OTP delivered via Nodemailer / Gmail SMTP, expires in 10 minutes |
+| Password login | bcrypt-hashed passwords, configurable salt rounds |
+| Registration | Self-registration with email verification |
+| JWT sessions | Short-lived access token (8 h) + long-lived refresh token (30 d) |
+| Password recovery | Secure reset link with 30-minute expiry |
+| Two-factor auth | TOTP-based 2FA setup and verification |
+| Remember me | Extended session via persistent refresh token |
+| Rate limiting | Separate limits for auth and general API endpoints |
+
+---
+
+## Technology Stack
+
+### Frontend
+| Technology | Version | Purpose |
+|---|---|---|
+| React | 19 | UI component framework |
+| TypeScript | ~6.0 | Static typing |
+| React Router DOM | 7.x | Client-side routing |
+| Vite | 8.x | Build tool and dev server |
+| Tailwind CSS | 4.x | Utility-first styling |
+
+### Backend
+| Technology | Version | Purpose |
+|---|---|---|
+| Node.js | ≥ 18.0.0 | Server runtime |
+| Express | 4.x | HTTP framework |
+| Mongoose | 8.x | MongoDB ODM |
+| jsonwebtoken | 9.x | JWT generation and verification |
+| bcryptjs | 2.x | Password hashing |
+| Nodemailer | 6.x | Email / OTP delivery |
+| Helmet | 7.x | HTTP security headers |
+| express-rate-limit | 7.x | API rate limiting |
+| express-validator | 7.x | Request validation |
+| express-mongo-sanitize | 2.x | NoSQL injection protection |
+| Winston | 3.x | Structured logging with daily rotation |
+| morgan | 1.x | HTTP request logging |
+| compression | 1.x | Gzip response compression |
+| cookie-parser | 1.x | HTTP-only cookie support |
+| multer | 1.x | File upload handling |
+| dotenv | 16.x | Environment variable loading |
+
+### Database
+- **MongoDB Atlas** — cloud-hosted MongoDB with TLS, connection pooling, and retry logic
+
+### Development Tools
+| Tool | Purpose |
+|---|---|
+| nodemon | Auto-restart backend on file change |
+| ESLint | Linting (frontend and backend) |
+| TypeScript ESLint | TypeScript-specific lint rules |
 
 ---
 
 ## Architecture
 
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Browser / Client                         │
+│              React 19 + TypeScript + Vite (port 5173)           │
+│                                                                 │
+│   Pages → API layer (fetch + JWT Bearer token) → React state   │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │  HTTPS / REST  (JSON)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Node.js / Express API                        │
+│                       (port 5001 / 5000)                        │
+│                                                                 │
+│   Helmet · CORS · Rate Limiter · Body Parser · Sanitiser        │
+│   ↓                                                             │
+│   Routes → Middleware (protect · authorize) → Controllers       │
+│   ↓                                                             │
+│   Mongoose Models → MongoDB Atlas                               │
+│   ↓                                                             │
+│   Nodemailer → Gmail SMTP (OTP · password reset · welcome)      │
+└─────────────────────────────────────────────────────────────────┘
+                              │  Mongoose + TLS
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       MongoDB Atlas                             │
+│         18 collections — users, orders, production,             │
+│         inventory, quality, maintenance, attendance, …          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Frontend layer** — A single-page application that manages routing, authentication state, and API communication. All data requests go through typed API helper functions that attach the JWT Bearer token automatically.
+
+**Backend layer** — A RESTful Express API with route-level JWT protection and role-based authorization. Controllers handle business logic and delegate persistence to Mongoose models. Structured logs are written by Winston.
+
+**Database layer** — MongoDB Atlas provides cloud persistence with a TLS-secured connection pool. Mongoose schemas enforce data structure, compute derived fields (e.g. defect rate, order totals), and auto-generate sequential document identifiers.
+
+---
+
+## Project Structure
+
+```
 Smart Manufacturing ERP/
-├── app/                    ← React 19 + Vite + TypeScript frontend
+├── app/                    # React + TypeScript frontend (Vite)
 │   ├── src/
-│   │   ├── api/            ← HTTP client + per-endpoint request functions
-│   │   ├── components/     ← Sidebar, TopBar, UI primitives, auth forms
-│   │   ├── context/        ← AuthContext (session state machine)
-│   │   ├── demo/           ← Dev-only demo session (dead-code-eliminated in prod)
-│   │   ├── hooks/          ← useAuth, usePermissions
-│   │   ├── layouts/        ← DashboardLayout
-│   │   ├── pages/          ← 30+ ERP module pages + all auth pages
-│   │   ├── routes/         ← AppRoutes, ProtectedRoute
-│   │   ├── services/       ← authService (token lifecycle, session storage)
-│   │   └── types/          ← TypeScript interfaces (auth, dashboard)
-│   └── .env.local          ← Frontend environment (VITE_API_URL, VITE_DEMO_MODE)
+│   │   ├── api/            # API helper functions and type definitions
+│   │   ├── components/     # Shared UI components (Modal, DataTable, etc.)
+│   │   ├── context/        # React context (AuthContext)
+│   │   ├── data/           # Static dashboard display data
+│   │   ├── hooks/          # Custom React hooks
+│   │   ├── layouts/        # DashboardLayout, AuthLayout
+│   │   ├── pages/          # One file per ERP module
+│   │   ├── routes/         # AppRoutes, ProtectedRoute
+│   │   ├── services/       # Auth service layer
+│   │   └── types/          # TypeScript type definitions
+│   ├── package.json
+│   └── vite.config.ts
 │
-└── backend/                ← Express + MongoDB REST API
-    ├── src/
-    │   ├── config/         ← index.js (all env vars), database.js
-    │   ├── controllers/    ← authController + 12 ERP controllers
-    │   ├── middleware/      ← auth (JWT), error, rateLimit, upload, validate
-    │   ├── models/         ← User, Product, Order, Production, Inventory,
-    │   │                     Machine, Employee, Customer, Supplier,
-    │   │                     Notification, Report, Settings
-    │   ├── routes/         ← auth + 12 ERP route files
-    │   ├── services/       ← authService (JWT helpers), emailService (Nodemailer)
-    │   ├── utils/          ← apiResponse, helpers, logger (Winston)
-    │   ├── validators/     ← auth.js (express-validator rule sets)
-    │   ├── app.js          ← Express app (security, CORS, routes)
-    │   └── server.js       ← Bootstrap (DB connect, listen, graceful shutdown)
-    ├── generate-env.js     ← One-time script to create .env with strong secrets
-    └── .env.example        ← Template for all environment variables
+├── backend/                # Node.js + Express REST API
+│   ├── src/
+│   │   ├── config/         # Environment config and MongoDB connection
+│   │   ├── controllers/    # Route handler logic (one per module)
+│   │   ├── middleware/      # auth, error, rateLimit, validate, upload
+│   │   ├── models/         # Mongoose schemas (18 models)
+│   │   ├── routes/         # Express routers (one per module)
+│   │   ├── services/       # emailService, notificationService
+│   │   └── utils/          # apiResponse, logger
+│   ├── package.json
+│   └── .env                # ⚠ Never committed — see Environment Variables
+│
+├── Assets/                 # Project assets
+├── Database/               # Database reference files
+├── Docs/                   # Project documentation and roadmap
+├── Prompts/                # Development prompts
+├── References/             # Reference materials
+└── README.md
 ```
 
 ---
 
-## Quick Start
+## Local Setup
 
-### Step 1 — MongoDB Atlas
+### Prerequisites
 
-1. Go to [https://cloud.mongodb.com](https://cloud.mongodb.com) and create a free account
-2. Create a free **M0 cluster** (any region)
-3. **Database Access** → Add a new database user with `readWrite` role
-4. **Network Access** → Add IP Address → Allow access from anywhere (`0.0.0.0/0`)
-5. **Connect** → Drivers → Node.js → copy the connection string
+- **Node.js** ≥ 18.0.0
+- **npm** ≥ 9.x
+- A **MongoDB Atlas** cluster (or local MongoDB instance)
+- A **Gmail account** with an App Password for SMTP (or use dev-mode without SMTP)
 
-### Step 2 — Backend environment
+### 1 — Clone the repository
 
 ```bash
-cd backend
-
-# Generate .env with strong auto-generated secrets
-node generate-env.js
-
-# Edit .env and paste your MongoDB connection string:
-# MONGO_URI=mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/smart_mfg_erp?retryWrites=true&w=majority
+git clone <repository-url>
+cd "Smart Manufacturing ERP"
 ```
 
-> **Email in development:** Leave `SMTP_USER` empty — the server runs in **Dev Email Mode**.
-> OTPs and verification links are printed to the terminal instead of being emailed.
-> No SMTP setup is required to test the full auth flow.
-
-### Step 3 — Install dependencies
+### 2 — Install backend dependencies
 
 ```bash
-# Terminal 1 — Backend
 cd backend
 npm install
+```
 
-# Terminal 2 — Frontend
+### 3 — Configure backend environment variables
+
+Create `backend/.env` (see [Environment Variables](#environment-variables) below).
+
+### 4 — Start the backend
+
+```bash
+# Development (auto-restart on file change)
+npm run dev
+
+# Production
+npm start
+```
+
+The API will start on `http://localhost:5001/api/v1` (or the port set in `.env`).
+
+### 5 — Install frontend dependencies
+
+Open a new terminal:
+
+```bash
 cd app
 npm install
 ```
 
-### Step 4 — Run both servers
+### 6 — Configure frontend environment variables
+
+Create `app/.env.local`:
+
+```env
+VITE_API_URL=http://localhost:5001/api/v1
+```
+
+### 7 — Start the frontend
 
 ```bash
-# Terminal 1 — Backend (http://localhost:5000)
-cd backend
-npm run dev
-
-# Terminal 2 — Frontend (http://localhost:5173)
-cd app
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
+The application will open at `http://localhost:5173`.
+
+### 8 — Build for production
+
+```bash
+# Frontend production build
+cd app
+npm run build
+```
 
 ---
 
 ## Environment Variables
 
-### Backend — `backend/.env`
+Sensitive configuration is stored in `.env` files and **must never be committed to version control**. Both `.env` files are listed in `.gitignore`.
 
-| Variable | Required | Description |
-|---|---|---|
-| `NODE_ENV` | | `development` or `production` |
-| `PORT` | | HTTP port (default: `5000`) |
-| `API_VERSION` | | Route prefix (default: `v1`) |
-| `MONGO_URI` | ★ | MongoDB Atlas connection string |
-| `JWT_SECRET` | ★ | 64+ char random secret for access tokens |
-| `JWT_EXPIRES_IN` | | Access token lifetime (default: `8h`) |
-| `JWT_REFRESH_SECRET` | ★ | 64+ char random secret for refresh tokens |
-| `JWT_REFRESH_EXPIRES_IN` | | Refresh token lifetime (default: `30d`) |
-| `BCRYPT_SALT_ROUNDS` | | Password hash rounds (default: `12`) |
-| `CORS_ORIGINS` | | Comma-separated allowed origins |
-| `COOKIE_SECRET` | | Cookie signing secret |
-| `COOKIE_SECURE` | | `true` in production (HTTPS only) |
-| `SMTP_HOST` | | SMTP server (e.g. `smtp.gmail.com`) |
-| `SMTP_PORT` | | SMTP port (e.g. `587`) |
-| `SMTP_USER` | | Email address — **leave empty for Dev Email Mode** |
-| `SMTP_PASS` | | Gmail App Password or SMTP password |
-| `EMAIL_FROM_NAME` | | Sender display name |
-| `EMAIL_FROM_ADDRESS` | | Sender email address |
-| `FRONTEND_URL` | | Frontend origin for email links |
+### `backend/.env` — required variables
 
-### Frontend — `app/.env.local`
+```env
+# Server
+NODE_ENV=development
+PORT=5001
+API_VERSION=v1
 
-| Variable | Description |
+# MongoDB (required)
+MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/<dbname>?retryWrites=true&w=majority
+
+# JWT (required — use strong random secrets)
+JWT_SECRET=<strong-random-secret>
+JWT_REFRESH_SECRET=<strong-random-secret>
+JWT_EXPIRES_IN=8h
+JWT_REFRESH_EXPIRES_IN=30d
+
+# CORS
+CORS_ORIGINS=http://localhost:5173
+
+# Email / SMTP (optional in development — OTPs print to console if not set)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-gmail@gmail.com
+SMTP_PASS=your-gmail-app-password
+EMAIL_FROM_NAME=Smart Manufacturing ERP
+EMAIL_FROM_ADDRESS=your-gmail@gmail.com
+
+# Cookie
+COOKIE_SECRET=<strong-random-secret>
+COOKIE_SECURE=false
+COOKIE_SAME_SITE=lax
+
+# Frontend URL (used in reset-password / verify-email links)
+FRONTEND_URL=http://localhost:5173
+```
+
+### `app/.env.local` — frontend
+
+```env
+VITE_API_URL=http://localhost:5001/api/v1
+```
+
+> **Security note:** Replace all placeholder values with strong, randomly generated secrets before deploying. Never log or expose `.env` file contents.
+
+---
+
+## Database
+
+The application uses **MongoDB Atlas** as its database. Connection options include TLS enforcement, a configurable connection pool (default: 2–10 connections), and automatic retry on transient network errors.
+
+Mongoose auto-generates sequential human-readable identifiers for records (e.g. `WO-000001`, `ATT-0001`, `QC-7201`) using pre-save hooks. Derived fields such as order totals and defect rates are computed on save.
+
+The backend seeds a default settings document on first startup using an upsert — this is safe to run on every restart.
+
+---
+
+## Email / OTP Delivery
+
+Email delivery is handled by **Nodemailer** configured to use **Gmail SMTP** (port 587, STARTTLS).
+
+The following transactional emails are sent:
+
+| Trigger | Template |
 |---|---|
-| `VITE_API_URL` | Backend API base URL (default: `http://localhost:5000/api/v1`) |
-| `VITE_DEMO_MODE` | `true` to enable Demo Mode button on login page |
+| New account registration | Welcome + email verification link |
+| Login (OTP flow) | 6-digit OTP code, expires in 10 minutes |
+| Forgot password | Password reset link, expires in 30 minutes |
+| Password changed | Security confirmation email |
+
+**Development mode:** If `SMTP_USER` is not set in `.env`, the email service runs in dev-mode — no emails are sent, and all OTP codes and verification links are printed directly to the backend console. This allows the full authentication flow to be tested without an SMTP server.
 
 ---
 
-## API Reference
+## Current Project Status
 
-All endpoints are prefixed with `/api/v1`
+The following is fully implemented:
 
-### Authentication
+- ✅ Complete email OTP authentication flow (register, login, verify, reset)
+- ✅ JWT access + refresh token session management
+- ✅ Role-based route protection (12 distinct roles)
+- ✅ All 20+ ERP module pages connected to real MongoDB backend
+- ✅ Full CRUD operations for all major modules
+- ✅ Form validation, error handling, and loading states throughout
+- ✅ Analytics dashboard with real database aggregations
+- ✅ CSV export for analytics reports
+- ✅ Structured API rate limiting (separate limits for auth and general endpoints)
+- ✅ Graceful shutdown, structured logging, and upload handling
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/auth/register` | No | Create account |
-| `POST` | `/auth/login` | No | Sign in |
-| `POST` | `/auth/logout` | JWT | Sign out |
-| `POST` | `/auth/refresh` | Cookie | Refresh access token |
-| `GET` | `/auth/profile` | JWT | Get current user |
-| `PUT` | `/auth/profile` | JWT | Update profile |
-| `PUT` | `/auth/change-password` | JWT | Change password |
-| `POST` | `/auth/forgot-password` | No | Send reset link |
-| `PUT` | `/auth/reset-password/:token` | No | Reset password |
-| `GET` | `/auth/verify-email/:token` | No | Verify email |
-| `POST` | `/auth/resend-verification` | No | Resend verification email |
-| `POST` | `/auth/send-otp` | No | Send OTP email |
-| `POST` | `/auth/verify-otp` | No | Verify OTP → get tokens |
-| `POST` | `/auth/2fa/setup` | JWT | Generate 2FA secret |
-| `POST` | `/auth/2fa/enable` | JWT | Enable 2FA |
-| `POST` | `/auth/2fa/disable` | JWT | Disable 2FA |
-| `DELETE` | `/auth/account` | JWT | Delete account |
-
-### Users (admin only)
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/users` | List all users (paginated) |
-| `GET` | `/users/:id` | Get user by ID |
-| `PUT` | `/users/:id` | Update user |
-| `DELETE` | `/users/:id` | Delete user |
-
-### ERP Modules
-
-All ERP routes follow the same RESTful pattern:
-
-| Base Path | Module |
-|---|---|
-| `/products` | Product catalogue |
-| `/inventory` | Inventory & transactions |
-| `/orders` | Sales & purchase orders |
-| `/production` | Work orders & manufacturing |
-| `/suppliers` | Supplier directory |
-| `/customers` | Customer accounts |
-| `/machines` | Machine register |
-| `/employees` | Employee HR records |
-| `/notifications` | System notifications |
-| `/reports` | Report generation |
-| `/settings` | System configuration |
+The application is a project/academic implementation. It has not been hardened for public production deployment.
 
 ---
 
-## Security Implementation
+## Future Improvements
 
-| Feature | Implementation |
-|---|---|
-| Password hashing | bcrypt (12 rounds) |
-| Access tokens | JWT (8h expiry, Authorization header + HTTP-only cookie) |
-| Refresh tokens | JWT (30d), hashed SHA-256 in DB, rotated on every use |
-| Route protection | `protect` middleware verifies JWT + checks `isActive` |
-| Role authorization | `authorize(...roles)` middleware |
-| Rate limiting | 10 req/15min on auth, 100 req/15min globally |
-| Security headers | Helmet (CSP, HSTS, XSS filter, etc.) |
-| CORS | Origin whitelist, credentials: true |
-| Input sanitization | `express-mongo-sanitize` (NoSQL injection prevention) |
-| Input validation | `express-validator` rule sets in `src/validators/` |
-| Account lockout | 5 failed attempts → 30min lockout |
+- [ ] Production deployment configuration (Docker, Nginx reverse proxy, HTTPS)
+- [ ] Automated test suite (unit tests for controllers, integration tests for API routes)
+- [ ] CI/CD pipeline (GitHub Actions or similar)
+- [ ] Advanced analytics with date-range filtering and trend comparisons
+- [ ] PDF report generation (in addition to CSV)
+- [ ] Granular permission enforcement at UI level (currently enforced at API level)
+- [ ] Real-time notifications via WebSocket
+- [ ] Pagination controls in frontend tables
+- [ ] File attachment support for orders and maintenance records
+- [ ] Multi-language / i18n support
+- [ ] Performance optimisation — API response caching, index tuning
 
 ---
 
-## Email / Dev Mode
+## Developer
 
-When `SMTP_USER` is empty in `.env`, the server enters **Dev Email Mode**:
+**Hemangkumar Hemantkumar Dave**
 
-- No actual emails are sent
-- OTP codes, verification URLs, and reset links are **printed to the backend terminal**
-- Newly registered accounts are **auto-verified** (no email step needed)
-- A clear `DEV EMAIL MODE` banner appears in the terminal
-
-This lets you test the full registration → OTP → login flow without any SMTP setup.
+B.E. Computer Engineering
+Sardar Patel College of Engineering, Bakrol, Anand, Gujarat
+Affiliated with Gujarat Technological University (GTU)
 
 ---
 
-## Demo Mode (Frontend Dev)
+## Disclaimer
 
-With `VITE_DEMO_MODE=true` in `app/.env.local`:
+This is an academic / project implementation of a Smart Manufacturing ERP system. While the application implements security fundamentals (JWT authentication, bcrypt password hashing, rate limiting, HTTP security headers, NoSQL injection protection, and input validation), it has not undergone a professional security audit, penetration test, or load test.
 
-- A **🚀 Enter Demo Mode** button appears on the login page
-- Clicking it instantly authenticates as **Demo Super Admin** (no backend call)
-- A yellow **DEMO MODE** badge appears in the top navbar
-- All ERP modules are accessible
-- **Zero effect in production builds** — Vite's static replacement of `import.meta.env.MODE` eliminates all demo code at bundle time
+Before using this system in a production or commercial environment, the following steps are recommended:
+
+- Professional security review and penetration testing
+- Infrastructure hardening (HTTPS, secrets management, firewall rules)
+- Comprehensive automated test coverage
+- Monitoring, alerting, and backup strategy
+- Compliance review appropriate to the deployment jurisdiction
 
 ---
 
-## Production Deployment Notes
-
-1. Set `NODE_ENV=production` in backend `.env`
-2. Set `COOKIE_SECURE=true` (HTTPS required)
-3. Set `COOKIE_SAME_SITE=none` if frontend and backend are on different domains
-4. Set real `SMTP_USER` / `SMTP_PASS` for email delivery
-5. Set `CORS_ORIGINS` to your production frontend URL only
-6. Set `VITE_API_URL` in frontend to your production backend URL
-7. Remove `VITE_DEMO_MODE=true` from frontend production environment
+*ForgeFlow — Smart Manufacturing Management · Built with Node.js, React, and MongoDB*
