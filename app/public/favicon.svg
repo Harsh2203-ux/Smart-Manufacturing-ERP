@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Outer square -->
+  <rect width="32" height="32" rx="7" fill="#1d4ed8"/>
+  <!-- Factory building body -->
+  <rect x="4" y="15" width="24" height="13" rx="1.5" fill="#ffffff" opacity="0.95"/>
+  <!-- Roof / gable -->
+  <polygon points="3,15 16,7 29,15" fill="#93c5fd"/>
+  <!-- Chimney left -->
+  <rect x="7" y="9" width="3.5" height="7" rx="1" fill="#93c5fd"/>
+  <!-- Chimney right -->
+  <rect x="12.5" y="11" width="3.5" height="5" rx="1" fill="#93c5fd"/>
+  <!-- Door -->
+  <rect x="13.5" y="20" width="5" height="8" rx="1" fill="#1d4ed8"/>
+  <!-- Window left -->
+  <rect x="6" y="19" width="5" height="4" rx="0.75" fill="#bfdbfe"/>
+  <!-- Window right -->
+  <rect x="21" y="19" width="5" height="4" rx="0.75" fill="#bfdbfe"/>
+  <!-- Ground line -->
+  <rect x="4" y="27.5" width="24" height="1" rx="0.5" fill="#93c5fd" opacity="0.5"/>
+</svg>

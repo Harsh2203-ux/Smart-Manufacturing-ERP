@@ -1,0 +1,182 @@
+/* ─── Inter variable font ─────────────────────────────────────────────────────
+   Loaded via <link> in index.html. The @supports rule below keeps system-ui
+   as a fallback for offline or intranet environments.                          */
+
+/* ─── Enterprise Blue / Indigo Design Tokens ─────────────────────────────── */
+:root {
+  /* ── Brand ──────────────────────────────────────────────────────────────── */
+  --brand-50:   #eff6ff;
+  --brand-100:  #dbeafe;
+  --brand-200:  #bfdbfe;
+  --brand-300:  #93c5fd;
+  --brand-500:  #3b82f6;
+  --brand-600:  #2563eb;
+  --brand-700:  #1d4ed8;
+  --brand-800:  #1e40af;
+  --brand-900:  #1e3a8a;
+
+  --accent:       var(--brand-700);   /* #1d4ed8 — primary CTA */
+  --accent-muted: var(--brand-500);   /* hover / disabled states */
+  --accent-light: var(--brand-50);    /* subtle tinted backgrounds */
+
+  /* ── Text ───────────────────────────────────────────────────────────────── */
+  --text:   #4b5563;   /* body / secondary */
+  --text-h: #0f172a;   /* headings / primary */
+
+  /* ── Page & surface backgrounds ─────────────────────────────────────────── */
+  --main-bg:     #f1f5f9;   /* slate-100 — page canvas */
+  --bg:          #ffffff;
+  --card-bg:     #ffffff;
+  --card-border: #e2e8f0;   /* slate-200 */
+
+  /* ── Sidebar (dark navy — enterprise feel) ──────────────────────────────── */
+  --sidebar-bg:          #0f172a;   /* slate-900 */
+  --sidebar-border:      #1e293b;   /* slate-800 */
+  --sidebar-text:        #94a3b8;   /* slate-400 */
+  --sidebar-text-active: #f8fafc;   /* slate-50 */
+  --sidebar-active-bg:   rgba(59, 130, 246, 0.18);  /* blue-500 @ 18% */
+
+  /* ── Top bar ─────────────────────────────────────────────────────────────── */
+  --topbar-bg:     #ffffff;
+  --topbar-border: #e2e8f0;
+  --topbar-text:   #0f172a;
+  --topbar-muted:  #94a3b8;
+
+  /* ── Form inputs ────────────────────────────────────────────────────────── */
+  --border:    #cbd5e1;   /* slate-300 */
+  --input-bg:  #f8fafc;   /* slate-50 */
+
+  /* ── Tables ─────────────────────────────────────────────────────────────── */
+  --table-head-bg:   #f8fafc;
+  --table-stripe-bg: #f8fafc;
+
+  /* ── Status: success ────────────────────────────────────────────────────── */
+  --success-bg:   #d1fae5;
+  --success-text: #065f46;
+
+  /* ── Status: warning ────────────────────────────────────────────────────── */
+  --warning-bg:   #fef3c7;
+  --warning-text: #92400e;
+
+  /* ── Status: error ──────────────────────────────────────────────────────── */
+  --error-bg:     #fee2e2;
+  --error-border: #fca5a5;
+  --error-text:   #991b1b;
+
+  /* ── Code / subtle surfaces ─────────────────────────────────────────────── */
+  --code-bg: #f1f5f9;
+
+  /* ── Elevation / shadow ─────────────────────────────────────────────────── */
+  --shadow-sm:
+    0 1px 3px 0   rgba(15, 23, 42, 0.07),
+    0 1px 2px -1px rgba(15, 23, 42, 0.05);
+  --shadow:
+    0 4px 6px -1px  rgba(15, 23, 42, 0.08),
+    0 2px 4px -2px  rgba(15, 23, 42, 0.05);
+  --shadow-lg:
+    0 10px 15px -3px rgba(15, 23, 42, 0.10),
+    0 4px  6px -4px  rgba(15, 23, 42, 0.06);
+
+  /* ── Typography ─────────────────────────────────────────────────────────── */
+  font-family: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--main-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";  /* Inter optical features */
+  color-scheme: light dark;
+}
+
+/* ─── Dark-mode overrides ────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent:       #60a5fa;   /* blue-400 — brighter on dark */
+    --accent-muted: #3b82f6;   /* blue-500 */
+    --accent-light: rgba(96, 165, 250, 0.12);
+
+    --text:   #94a3b8;   /* slate-400 */
+    --text-h: #f1f5f9;   /* slate-100 */
+
+    --main-bg:     #0a0f1e;   /* deep navy canvas */
+    --bg:          #0f172a;
+    --card-bg:     #1e293b;   /* slate-800 */
+    --card-border: #334155;   /* slate-700 */
+
+    --sidebar-bg:          #07090f;
+    --sidebar-border:      #1e293b;
+    --sidebar-text:        #64748b;   /* slate-500 */
+    --sidebar-text-active: #e2e8f0;   /* slate-200 */
+    --sidebar-active-bg:   rgba(96, 165, 250, 0.14);
+
+    --topbar-bg:     #1e293b;
+    --topbar-border: #334155;
+    --topbar-text:   #f1f5f9;
+    --topbar-muted:  #64748b;
+
+    --border:   #334155;
+    --input-bg: #0f172a;
+
+    --table-head-bg:   #0f172a;
+    --table-stripe-bg: #162032;
+
+    --success-bg:   rgba(6, 95, 70, 0.22);
+    --success-text: #6ee7b7;
+    --warning-bg:   rgba(146, 64, 14, 0.22);
+    --warning-text: #fcd34d;
+    --error-bg:     rgba(153, 27, 27, 0.22);
+    --error-border: rgba(252, 165, 165, 0.28);
+    --error-text:   #fca5a5;
+
+    --code-bg: #1e293b;
+
+    --shadow-sm:
+      0 1px 3px 0   rgba(0, 0, 0, 0.35),
+      0 1px 2px -1px rgba(0, 0, 0, 0.25);
+    --shadow:
+      0 4px 6px -1px  rgba(0, 0, 0, 0.45),
+      0 2px 4px -2px  rgba(0, 0, 0, 0.30);
+    --shadow-lg:
+      0 10px 15px -3px rgba(0, 0, 0, 0.55),
+      0 4px  6px -4px  rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* ─── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--main-bg);
+}
+
+/* Full-viewport root */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+h1, h2, h3, h4 {
+  font-family: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+}
+
+/* Inter renders best at these sizes with tight tracking */
+.text-xs   { font-size: 11px; letter-spacing:  0.02em; }
+.text-sm   { font-size: 13px; }
+.text-base { font-size: 15px; }
+.text-lg   { font-size: 17px; font-weight: 500; }
+.text-xl   { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
