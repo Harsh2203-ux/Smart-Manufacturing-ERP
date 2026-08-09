@@ -4,20 +4,28 @@ const config     = require('../config');
 const logger     = require('../utils/logger');
 
 // ── Provider selection ──────────────────────────────────────────────────────────
-// EMAIL_PROVIDER=smtp  → Nodemailer/SMTP (default, required for Railway)
-// EMAIL_PROVIDER=resend → Resend (optional, kept for future use)
-const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || 'smtp').toLowerCase().trim();
-
-// ── SMTP configuration ──────────────────────────────────────────────────────────
-const smtpConfig = config.email.smtp;
+// EMAIL_PROVIDER=resend → Resend API (default, used in production on Railway)
+// EMAIL_PROVIDER=smtp   → Nodemailer/SMTP (optional fallback)
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || 'resend').toLowerCase().trim();
 
 // ── Dev-mode detection ──────────────────────────────────────────────────────────
-// When EMAIL_PROVIDER=smtp: dev mode if SMTP_USER or SMTP_PASS is not set.
-// When EMAIL_PROVIDER=resend: dev mode if RESEND_API_KEY is not set.
+// resend: dev mode if RESEND_API_KEY is absent.
+// smtp:   dev mode if SMTP_USER or SMTP_PASS is absent.
 let IS_DEV_EMAIL = false;
 
-if (EMAIL_PROVIDER === 'smtp') {
-  IS_DEV_EMAIL = !smtpConfig.user || !smtpConfig.pass;
+if (EMAIL_PROVIDER === 'resend') {
+  IS_DEV_EMAIL = !process.env.RESEND_API_KEY || process.env.RESEND_API_KEY.trim() === '';
+  if (IS_DEV_EMAIL) {
+    logger.warn(
+      '[emailService] ⚠  RESEND_API_KEY not configured — running in DEV EMAIL MODE.\n' +
+      '  Verification tokens, OTPs and reset links will be printed to this console.\n' +
+      '  Set RESEND_API_KEY in .env to send real emails.'
+    );
+  }
+} else if (EMAIL_PROVIDER === 'smtp') {
+  const smtpUser = process.env.SMTP_USER || '';
+  const smtpPass = process.env.SMTP_PASS || '';
+  IS_DEV_EMAIL = !smtpUser || !smtpPass;
   if (IS_DEV_EMAIL) {
     logger.warn(
       '[emailService] ⚠  SMTP credentials not configured — running in DEV EMAIL MODE.\n' +
@@ -25,45 +33,35 @@ if (EMAIL_PROVIDER === 'smtp') {
       '  Set SMTP_USER and SMTP_PASS in .env to send real emails.'
     );
   }
-} else if (EMAIL_PROVIDER === 'resend') {
-  IS_DEV_EMAIL = !process.env.RESEND_API_KEY || process.env.RESEND_API_KEY.trim() === '';
-  if (IS_DEV_EMAIL) {
-    logger.warn(
-      '[emailService] ⚠  Resend API key not configured — running in DEV EMAIL MODE.\n' +
-      '  Set RESEND_API_KEY in .env to send real emails.'
-    );
-  }
 } else {
   logger.warn(`[emailService] Unknown EMAIL_PROVIDER="${EMAIL_PROVIDER}". Defaulting to DEV EMAIL MODE.`);
   IS_DEV_EMAIL = true;
 }
 
-// ── Nodemailer transporter (created only for SMTP provider with credentials) ────
-let _transporter = null;
-
-if (EMAIL_PROVIDER === 'smtp' && !IS_DEV_EMAIL) {
-  _transporter = nodemailer.createTransport({
-    host:   smtpConfig.host,
-    port:   smtpConfig.port,
-    secure: smtpConfig.secure,   // true = TLS/465, false = STARTTLS/587
-    auth: {
-      user: smtpConfig.user,
-      pass: smtpConfig.pass,
-    },
-    // Prevent connection errors from crashing the process
-    connectionTimeout: 10000,
-    greetingTimeout:   10000,
-    socketTimeout:     30000,
-  });
-}
-
-// ── Resend client (lazy-loaded only when needed) ────────────────────────────────
+// ── Resend client (lazy-loaded on first send) ───────────────────────────────────
 let _resend = null;
 function getResendClient() {
   if (_resend) return _resend;
   const { Resend } = require('resend');
   _resend = new Resend(process.env.RESEND_API_KEY);
   return _resend;
+}
+
+// ── Nodemailer transporter (created only when EMAIL_PROVIDER=smtp with credentials)
+let _transporter = null;
+if (EMAIL_PROVIDER === 'smtp' && !IS_DEV_EMAIL) {
+  _transporter = nodemailer.createTransport({
+    host:   process.env.SMTP_HOST   || 'smtp.gmail.com',
+    port:   parseInt(process.env.SMTP_PORT, 10) || 587,
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    connectionTimeout: 10000,
+    greetingTimeout:   10000,
+    socketTimeout:     30000,
+  });
 }
 
 // ── verifySmtpConnection ────────────────────────────────────────────────────────
@@ -74,24 +72,24 @@ async function verifySmtpConnection() {
     return false;
   }
 
+  if (EMAIL_PROVIDER === 'resend') {
+    logger.info(`[Resend] ✅  Resend client ready — from="${config.email.fromName}" <${config.email.fromAddress}>`);
+    return true;
+  }
+
   if (EMAIL_PROVIDER === 'smtp') {
     try {
       await _transporter.verify();
       logger.info(
-        `[SMTP] ✅  SMTP connection verified — host=${smtpConfig.host}:${smtpConfig.port} ` +
-        `secure=${smtpConfig.secure} from="${config.email.fromName}" <${config.email.fromAddress}>`
+        `[SMTP] ✅  SMTP connection verified — ` +
+        `host=${process.env.SMTP_HOST}:${process.env.SMTP_PORT} ` +
+        `from="${config.email.fromName}" <${config.email.fromAddress}>`
       );
       return true;
     } catch (err) {
-      // Log the problem but do NOT crash — the server runs regardless
-      logger.error(`[SMTP] ❌  SMTP connection failed — host=${smtpConfig.host}:${smtpConfig.port} | ${err.message}`);
+      logger.error(`[SMTP] ❌  SMTP connection failed — host=${process.env.SMTP_HOST}:${process.env.SMTP_PORT} | ${err.message}`);
       return false;
     }
-  }
-
-  if (EMAIL_PROVIDER === 'resend') {
-    logger.info(`[Resend] ✅  Resend client ready — from="${config.email.fromName}" <${config.email.fromAddress}>`);
-    return true;
   }
 
   return false;
@@ -120,27 +118,6 @@ async function sendMail({ to, subject, html, text, _devHint }) {
     return { devMode: true };
   }
 
-  // ── SMTP send ─────────────────────────────────────────────────────────────────
-  if (EMAIL_PROVIDER === 'smtp') {
-    const fromString = `"${config.email.fromName}" <${config.email.fromAddress}>`;
-    logger.info(`[sendMail] SMTP SEND — from=${fromString}`);
-    try {
-      const info = await _transporter.sendMail({
-        from:    fromString,
-        to,
-        subject,
-        html,
-        text:    text || html.replace(/<[^>]+>/g, ''),
-      });
-      logger.info(`[sendMail] SMTP SENT — messageId=${info.messageId}`);
-      return { messageId: info.messageId };
-    } catch (err) {
-      // Log without exposing credentials
-      logger.error(`[sendMail] SMTP FAILED — to=${to} | message=${err.message}`);
-      throw err;
-    }
-  }
-
   // ── Resend send ───────────────────────────────────────────────────────────────
   if (EMAIL_PROVIDER === 'resend') {
     logger.info(`[sendMail] Resend SEND — from="${config.email.fromName}" <${config.email.fromAddress}>`);
@@ -163,6 +140,26 @@ async function sendMail({ to, subject, html, text, _devHint }) {
       return { messageId: data.id };
     } catch (err) {
       logger.error(`[sendMail] Resend FAILED — to=${to} | message=${err.message}`);
+      throw err;
+    }
+  }
+
+  // ── SMTP send (fallback) ──────────────────────────────────────────────────────
+  if (EMAIL_PROVIDER === 'smtp') {
+    const fromString = `"${config.email.fromName}" <${config.email.fromAddress}>`;
+    logger.info(`[sendMail] SMTP SEND — from=${fromString}`);
+    try {
+      const info = await _transporter.sendMail({
+        from:    fromString,
+        to,
+        subject,
+        html,
+        text:    text || html.replace(/<[^>]+>/g, ''),
+      });
+      logger.info(`[sendMail] SMTP SENT — messageId=${info.messageId}`);
+      return { messageId: info.messageId };
+    } catch (err) {
+      logger.error(`[sendMail] SMTP FAILED — to=${to} | message=${err.message}`);
       throw err;
     }
   }

@@ -84,7 +84,7 @@ module.exports = {
   },
 
   // ── Email ─────────────────────────────────────────────────────────────────────
-  // Active provider selected by EMAIL_PROVIDER env var (default: smtp)
+  // Active provider selected by EMAIL_PROVIDER env var (default: resend)
   email: {
     // Shared sender identity
     fromName:    process.env.EMAIL_FROM_NAME    || process.env.RESEND_FROM_NAME    || 'Smart Manufacturing ERP',
