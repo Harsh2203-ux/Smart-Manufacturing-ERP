@@ -16,7 +16,7 @@ import type { ApiResponse } from "../types/auth";
 
 const API_BASE =
   (import.meta.env.VITE_API_URL as string | undefined) ??
-  "http://localhost:5001/api/v1";
+  "https://smart-manufacturing-erp-kfa1.onrender.com/api/v1";
 
 // ── In-memory access token ─────────────────────────────────────────────────────
 let _accessToken: string | null = null;
