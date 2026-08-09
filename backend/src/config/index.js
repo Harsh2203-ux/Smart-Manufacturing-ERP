@@ -83,15 +83,11 @@ module.exports = {
               (process.env.NODE_ENV === 'production' ? 10 : 20),
   },
 
-  // ── Email ─────────────────────────────────────────────────────────────────────
+  // ── Email (Resend) ────────────────────────────────────────────────────────────
   email: {
-    host:    process.env.SMTP_HOST          || 'smtp.mailtrap.io',
-    port:    parseInt(process.env.SMTP_PORT, 10) || 587,
-    secure:  process.env.SMTP_SECURE        === 'true',
-    user:    process.env.SMTP_USER          || '',
-    pass:    process.env.SMTP_PASS          || '',
-    fromName:process.env.EMAIL_FROM_NAME    || 'Smart Manufacturing ERP',
-    fromAddress:process.env.EMAIL_FROM_ADDRESS || 'noreply@erp.local',
+    apiKey:      process.env.RESEND_API_KEY      || '',
+    fromName:    process.env.RESEND_FROM_NAME    || 'Smart Manufacturing ERP',
+    fromAddress: process.env.RESEND_FROM_EMAIL   || 'onboarding@resend.dev',
   },
 
   // ── File uploads ──────────────────────────────────────────────────────────────

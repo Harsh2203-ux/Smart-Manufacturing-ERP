@@ -52,7 +52,7 @@ async function bootstrap() {
   await Setting.seed();
   logger.info('Default settings seeded.');
 
-  // Verify SMTP connection — non-fatal: logs success or failure then continues
+  // Verify Resend configuration — non-fatal: logs status then continues
   await verifySmtpConnection();
 
   const server = app.listen(config.port, () => {

@@ -2,19 +2,20 @@
 /**
  * POST /api/v1/test/email
  *
- * Sends a real test email via Nodemailer and reports the exact outcome.
- * Useful for verifying Gmail SMTP credentials without touching auth logic.
+ * Sends a real test email via Resend and reports the exact outcome.
+ * Useful for verifying Resend credentials without touching auth logic.
  *
  * Body:  { "email": "recipient@example.com" }
  * Returns:
  *   200 { success: true,  message: "Email sent successfully", messageId: "..." }
  *   400 { success: false, message: "email field is required" }
- *   500 { success: false, message: "<exact SMTP error>" }
+ *   503 { success: false, message: "Resend is not configured..." }
+ *   500 { success: false, message: "<exact Resend error>" }
  */
 
 const router     = require('express').Router();
 const { body, validationResult } = require('express-validator');
-const { IS_DEV_EMAIL, transporter } = require('../services/emailService');
+const { IS_DEV_EMAIL, sendMail } = require('../services/emailService');
 const config     = require('../config');
 
 router.post(
@@ -39,33 +40,32 @@ router.post(
     const { email } = req.body;
 
     // ── Dev-mode guard ──────────────────────────────────────────────────────────
-    // If SMTP is not configured the transporter is null.  Return a clear message
-    // instead of crashing so the developer knows what to fix.
-    if (IS_DEV_EMAIL || !transporter) {
+    // If Resend is not configured, return a clear message so the developer knows
+    // what to fix.
+    if (IS_DEV_EMAIL) {
       return res.status(503).json({
         success: false,
         message:
-          'SMTP is not configured. Set SMTP_USER and SMTP_PASS in .env to send real emails.',
+          'Resend is not configured. Set RESEND_API_KEY in .env to send real emails.',
       });
     }
 
     // ── Send test email ─────────────────────────────────────────────────────────
     try {
-      const info = await transporter.sendMail({
-        from:    `"${config.email.fromName}" <${config.email.fromAddress}>`,
+      const result = await sendMail({
         to:      email,
-        subject: '✅ Smart Manufacturing ERP — SMTP test',
-        text:    'This is a test email from Smart Manufacturing ERP. If you received this, Gmail SMTP is working correctly.',
+        subject: '✅ Smart Manufacturing ERP — Resend test',
+        text:    'This is a test email from Smart Manufacturing ERP. If you received this, Resend is working correctly.',
         html: `
           <div style="font-family:sans-serif;max-width:480px;margin:40px auto;padding:32px;
                       border:1px solid #e2e8f0;border-radius:10px;background:#ffffff;">
-            <h2 style="margin:0 0 12px;color:#0f172a;font-size:18px;">✅ SMTP Test Successful</h2>
+            <h2 style="margin:0 0 12px;color:#0f172a;font-size:18px;">✅ Resend Test Successful</h2>
             <p style="margin:0 0 16px;color:#475569;font-size:14px;line-height:1.6;">
               This is a test email from <strong>Smart Manufacturing ERP</strong>.<br/>
-              Gmail SMTP is configured and sending correctly.
+              Resend is configured and sending correctly.
             </p>
             <p style="margin:0;font-size:12px;color:#94a3b8;">
-              Sent via ${config.email.host}:${config.email.port} as ${config.email.user}
+              Sent from ${config.email.fromAddress}
             </p>
           </div>`,
       });
@@ -73,15 +73,14 @@ router.post(
       return res.status(200).json({
         success:   true,
         message:   'Email sent successfully',
-        messageId: info.messageId,
+        messageId: result.messageId,
         to:        email,
       });
     } catch (err) {
       return res.status(500).json({
         success: false,
-        message: err.message,           // exact SMTP error surfaced to caller
-        code:    err.code   || null,
-        command: err.command|| null,
+        message: err.message,
+        name:    err.name || null,
       });
     }
   }

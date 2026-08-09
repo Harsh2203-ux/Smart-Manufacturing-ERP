@@ -1,59 +1,51 @@
 'use strict';
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const config     = require('../config');
 const logger     = require('../utils/logger');
 
 // ── Dev-mode detection ─────────────────────────────────────────────────────────
-// If SMTP_USER is empty / not configured we are in development mode.
+// If RESEND_API_KEY is empty / not configured we are in development mode.
 // Emails are NOT sent — instead the relevant token/OTP is printed to the console
-// so developers can still test the full flow without an SMTP server.
+// so developers can still test the full flow without a Resend account.
 
-const IS_DEV_EMAIL = !config.email.user || config.email.user.trim() === '';
+const IS_DEV_EMAIL = !config.email.apiKey || config.email.apiKey.trim() === '';
 
 if (IS_DEV_EMAIL) {
   logger.warn(
-    '[emailService] ⚠  SMTP not configured — running in DEV EMAIL MODE.\n' +
+    '[emailService] ⚠  Resend API key not configured — running in DEV EMAIL MODE.\n' +
     '  Verification tokens, OTPs and reset links will be printed to this console.\n' +
-    '  Set SMTP_USER / SMTP_PASS in .env to send real emails.'
+    '  Set RESEND_API_KEY in .env to send real emails.'
   );
 }
 
-// ── Transporter (only created when SMTP is configured) ─────────────────────────
-let transporter = null;
+// ── Resend client (only created when API key is configured) ────────────────────
+let resend = null;
 
 if (!IS_DEV_EMAIL) {
-  transporter = nodemailer.createTransport({
-    host:   config.email.host,
-    port:   config.email.port,
-    secure: config.email.secure,
-    auth: {
-      user: config.email.user,
-      pass: config.email.pass,
-    },
-  });
+  resend = new Resend(config.email.apiKey);
 }
 
-// ── verifySmtpConnection ───────────────────────────────────────────────────────
+// ── verifyEmailConnection ──────────────────────────────────────────────────────
 // Called once on server startup.  Resolves true on success, false in dev mode.
-// Logs the outcome; never throws — a broken SMTP connection should not crash the server.
-async function verifySmtpConnection() {
+// Logs the outcome; never throws — a missing API key should not crash the server.
+async function verifyEmailConnection() {
   if (IS_DEV_EMAIL) {
-    logger.warn('[SMTP] Running in DEV EMAIL MODE — no real emails will be sent.');
+    logger.warn('[Resend] Running in DEV EMAIL MODE — no real emails will be sent.');
     return false;
   }
-  try {
-    await transporter.verify();
-    logger.info(`[SMTP] ✅  SMTP connected successfully — ${config.email.host}:${config.email.port} as ${config.email.user}`);
-    return true;
-  } catch (err) {
-    logger.error(`[SMTP] ❌  SMTP connection failed: ${err.message}`);
-    return false;
-  }
+  // Resend has no explicit "ping" endpoint; we confirm the key is present and
+  // the client is initialised.  Any actual send error will surface on first use.
+  logger.info(`[Resend] ✅  Resend client initialised — from: "${config.email.fromName}" <${config.email.fromAddress}>`);
+  return true;
 }
+
+// Backward-compatible alias used in server.js
+const verifySmtpConnection = verifyEmailConnection;
 
 // ── sendMail ───────────────────────────────────────────────────────────────────
-// Returns { devMode: true } when SMTP is not configured so callers know the email
-// was not actually sent.  Never throws in dev mode.
+// Returns { messageId } on success (compatible with existing callers).
+// Returns { devMode: true } when Resend is not configured so callers know the
+// email was not actually sent.  Never throws in dev mode.
 
 async function sendMail({ to, subject, html, text, _devHint }) {
   logger.info(`[sendMail] SENDMAIL START — to=${to} | subject="${subject}"`);
@@ -72,19 +64,28 @@ async function sendMail({ to, subject, html, text, _devHint }) {
     return { devMode: true };
   }
 
-  logger.info(`[sendMail] SMTP SEND START — host=${config.email.host}:${config.email.port} from=${config.email.fromAddress}`);
+  logger.info(`[sendMail] Resend SEND START — from="${config.email.fromName}" <${config.email.fromAddress}>`);
   try {
-    const info = await transporter.sendMail({
-      from: `"${config.email.fromName}" <${config.email.fromAddress}>`,
-      to,
+    const { data, error } = await resend.emails.send({
+      from:    `${config.email.fromName} <${config.email.fromAddress}>`,
+      to:      [to],
       subject,
       html,
-      text: text || html.replace(/<[^>]+>/g, ''),
+      text:    text || html.replace(/<[^>]+>/g, ''),
     });
-    logger.info(`[sendMail] SMTP SEND RESULT — messageId=${info.messageId} | response=${info.response}`);
-    return info;
+
+    if (error) {
+      logger.error(`[sendMail] Resend API error — to=${to} | name=${error.name} | message=${error.message}`);
+      const err = new Error(error.message || 'Resend API error');
+      err.name = error.name;
+      throw err;
+    }
+
+    logger.info(`[sendMail] Resend SEND RESULT — id=${data.id}`);
+    // Return shape compatible with existing callers that read mailResult.messageId
+    return { messageId: data.id };
   } catch (err) {
-    logger.error(`[sendMail] SMTP SEND FAILED — to=${to} | message=${err.message} | code=${err.code} | response=${err.response} | responseCode=${err.responseCode} | command=${err.command}`);
+    logger.error(`[sendMail] Resend SEND FAILED — to=${to} | message=${err.message}`);
     throw err;
   }
 }
@@ -291,9 +292,9 @@ function passwordChangedTemplate(name) {
 
 module.exports = {
   IS_DEV_EMAIL,
-  transporter,
   sendMail,
-  verifySmtpConnection,
+  verifySmtpConnection,   // backward-compat alias (used in server.js)
+  verifyEmailConnection,
   verifyEmailTemplate,
   resetPasswordTemplate,
   otpTemplate,
