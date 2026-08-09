@@ -1,0 +1,16 @@
+# Railway deployment configuration for Smart Manufacturing ERP backend
+# https://docs.railway.app/reference/config-as-code
+
+[build]
+# Railway auto-detects Node.js — no custom build command needed for plain JS
+# If you add a build step (e.g. TypeScript compilation), set it here:
+# builder = "NIXPACKS"
+# buildCommand = "npm run build"
+
+[deploy]
+# Use the existing package.json "start" script: node src/server.js
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

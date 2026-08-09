@@ -1,2 +1,8 @@
+# Backend secrets — never commit these files
 .env
+.env.*
+!.env.example
 node_modules/
+
+# Upload files (local only — Railway uses ephemeral storage)
+uploads/

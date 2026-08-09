@@ -14,9 +14,12 @@
 
 import type { ApiResponse } from "../types/auth";
 
+// VITE_API_URL must be set as an environment variable.
+// Local development: set in app/.env.local
+// Production:        set VITE_API_URL in Vercel project environment variables
 const API_BASE =
   (import.meta.env.VITE_API_URL as string | undefined) ??
-  "https://smart-manufacturing-erp-kfa1.onrender.com/api/v1";
+  "http://localhost:5000/api/v1";
 
 // ── In-memory access token ─────────────────────────────────────────────────────
 let _accessToken: string | null = null;

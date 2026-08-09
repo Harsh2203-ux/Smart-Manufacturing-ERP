@@ -83,11 +83,22 @@ module.exports = {
               (process.env.NODE_ENV === 'production' ? 10 : 20),
   },
 
-  // ── Email (Resend) ────────────────────────────────────────────────────────────
+  // ── Email ─────────────────────────────────────────────────────────────────────
+  // Active provider selected by EMAIL_PROVIDER env var (default: smtp)
   email: {
-    apiKey:      process.env.RESEND_API_KEY      || '',
-    fromName:    process.env.RESEND_FROM_NAME    || 'Smart Manufacturing ERP',
-    fromAddress: process.env.RESEND_FROM_EMAIL   || 'onboarding@resend.dev',
+    // Shared sender identity
+    fromName:    process.env.EMAIL_FROM_NAME    || process.env.RESEND_FROM_NAME    || 'Smart Manufacturing ERP',
+    fromAddress: process.env.EMAIL_FROM_ADDRESS || process.env.RESEND_FROM_EMAIL   || 'noreply@example.com',
+    // SMTP (Nodemailer) — used when EMAIL_PROVIDER=smtp
+    smtp: {
+      host:   process.env.SMTP_HOST   || 'smtp.gmail.com',
+      port:   parseInt(process.env.SMTP_PORT, 10) || 587,
+      secure: process.env.SMTP_SECURE === 'true',   // false = STARTTLS (port 587)
+      user:   process.env.SMTP_USER   || '',
+      pass:   process.env.SMTP_PASS   || '',
+    },
+    // Resend — kept for optional future use (EMAIL_PROVIDER=resend)
+    apiKey: process.env.RESEND_API_KEY || '',
   },
 
   // ── File uploads ──────────────────────────────────────────────────────────────

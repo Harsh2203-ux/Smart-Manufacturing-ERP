@@ -1,96 +1,177 @@
 'use strict';
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const config     = require('../config');
 const logger     = require('../utils/logger');
 
-// ── Dev-mode detection ─────────────────────────────────────────────────────────
-// If RESEND_API_KEY is empty / not configured we are in development mode.
-// Emails are NOT sent — instead the relevant token/OTP is printed to the console
-// so developers can still test the full flow without a Resend account.
+// ── Provider selection ──────────────────────────────────────────────────────────
+// EMAIL_PROVIDER=smtp  → Nodemailer/SMTP (default, required for Railway)
+// EMAIL_PROVIDER=resend → Resend (optional, kept for future use)
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || 'smtp').toLowerCase().trim();
 
-const IS_DEV_EMAIL = !config.email.apiKey || config.email.apiKey.trim() === '';
+// ── SMTP configuration ──────────────────────────────────────────────────────────
+const smtpConfig = config.email.smtp;
 
-if (IS_DEV_EMAIL) {
-  logger.warn(
-    '[emailService] ⚠  Resend API key not configured — running in DEV EMAIL MODE.\n' +
-    '  Verification tokens, OTPs and reset links will be printed to this console.\n' +
-    '  Set RESEND_API_KEY in .env to send real emails.'
-  );
-}
+// ── Dev-mode detection ──────────────────────────────────────────────────────────
+// When EMAIL_PROVIDER=smtp: dev mode if SMTP_USER or SMTP_PASS is not set.
+// When EMAIL_PROVIDER=resend: dev mode if RESEND_API_KEY is not set.
+let IS_DEV_EMAIL = false;
 
-// ── Resend client (only created when API key is configured) ────────────────────
-let resend = null;
-
-if (!IS_DEV_EMAIL) {
-  resend = new Resend(config.email.apiKey);
-}
-
-// ── verifyEmailConnection ──────────────────────────────────────────────────────
-// Called once on server startup.  Resolves true on success, false in dev mode.
-// Logs the outcome; never throws — a missing API key should not crash the server.
-async function verifyEmailConnection() {
+if (EMAIL_PROVIDER === 'smtp') {
+  IS_DEV_EMAIL = !smtpConfig.user || !smtpConfig.pass;
   if (IS_DEV_EMAIL) {
-    logger.warn('[Resend] Running in DEV EMAIL MODE — no real emails will be sent.');
+    logger.warn(
+      '[emailService] ⚠  SMTP credentials not configured — running in DEV EMAIL MODE.\n' +
+      '  Verification tokens, OTPs and reset links will be printed to this console.\n' +
+      '  Set SMTP_USER and SMTP_PASS in .env to send real emails.'
+    );
+  }
+} else if (EMAIL_PROVIDER === 'resend') {
+  IS_DEV_EMAIL = !process.env.RESEND_API_KEY || process.env.RESEND_API_KEY.trim() === '';
+  if (IS_DEV_EMAIL) {
+    logger.warn(
+      '[emailService] ⚠  Resend API key not configured — running in DEV EMAIL MODE.\n' +
+      '  Set RESEND_API_KEY in .env to send real emails.'
+    );
+  }
+} else {
+  logger.warn(`[emailService] Unknown EMAIL_PROVIDER="${EMAIL_PROVIDER}". Defaulting to DEV EMAIL MODE.`);
+  IS_DEV_EMAIL = true;
+}
+
+// ── Nodemailer transporter (created only for SMTP provider with credentials) ────
+let _transporter = null;
+
+if (EMAIL_PROVIDER === 'smtp' && !IS_DEV_EMAIL) {
+  _transporter = nodemailer.createTransport({
+    host:   smtpConfig.host,
+    port:   smtpConfig.port,
+    secure: smtpConfig.secure,   // true = TLS/465, false = STARTTLS/587
+    auth: {
+      user: smtpConfig.user,
+      pass: smtpConfig.pass,
+    },
+    // Prevent connection errors from crashing the process
+    connectionTimeout: 10000,
+    greetingTimeout:   10000,
+    socketTimeout:     30000,
+  });
+}
+
+// ── Resend client (lazy-loaded only when needed) ────────────────────────────────
+let _resend = null;
+function getResendClient() {
+  if (_resend) return _resend;
+  const { Resend } = require('resend');
+  _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
+
+// ── verifySmtpConnection ────────────────────────────────────────────────────────
+// Called once on server startup. Logs status. Never throws.
+async function verifySmtpConnection() {
+  if (IS_DEV_EMAIL) {
+    logger.warn(`[emailService] Running in DEV EMAIL MODE (provider=${EMAIL_PROVIDER}) — no real emails will be sent.`);
     return false;
   }
-  // Resend has no explicit "ping" endpoint; we confirm the key is present and
-  // the client is initialised.  Any actual send error will surface on first use.
-  logger.info(`[Resend] ✅  Resend client initialised — from: "${config.email.fromName}" <${config.email.fromAddress}>`);
-  return true;
+
+  if (EMAIL_PROVIDER === 'smtp') {
+    try {
+      await _transporter.verify();
+      logger.info(
+        `[SMTP] ✅  SMTP connection verified — host=${smtpConfig.host}:${smtpConfig.port} ` +
+        `secure=${smtpConfig.secure} from="${config.email.fromName}" <${config.email.fromAddress}>`
+      );
+      return true;
+    } catch (err) {
+      // Log the problem but do NOT crash — the server runs regardless
+      logger.error(`[SMTP] ❌  SMTP connection failed — host=${smtpConfig.host}:${smtpConfig.port} | ${err.message}`);
+      return false;
+    }
+  }
+
+  if (EMAIL_PROVIDER === 'resend') {
+    logger.info(`[Resend] ✅  Resend client ready — from="${config.email.fromName}" <${config.email.fromAddress}>`);
+    return true;
+  }
+
+  return false;
 }
 
 // Backward-compatible alias used in server.js
-const verifySmtpConnection = verifyEmailConnection;
+const verifyEmailConnection = verifySmtpConnection;
 
-// ── sendMail ───────────────────────────────────────────────────────────────────
-// Returns { messageId } on success (compatible with existing callers).
-// Returns { devMode: true } when Resend is not configured so callers know the
-// email was not actually sent.  Never throws in dev mode.
+// ── sendMail ────────────────────────────────────────────────────────────────────
+// Returns { messageId } on success.
+// Returns { devMode: true } in dev mode (no real email sent).
+// Never swallows errors in production — callers must handle them.
 
 async function sendMail({ to, subject, html, text, _devHint }) {
-  logger.info(`[sendMail] SENDMAIL START — to=${to} | subject="${subject}"`);
+  logger.info(`[sendMail] START — provider=${EMAIL_PROVIDER} to=${to} subject="${subject}"`);
 
+  // ── Dev mode: print to console, return devMode flag ──────────────────────────
   if (IS_DEV_EMAIL) {
-    // Print a clearly formatted dev-mode block to the console
     const border = '─'.repeat(64);
     console.log(`\n${border}`);
     console.log(`📬  DEV EMAIL — would have sent to: ${to}`);
     console.log(`    Subject : ${subject}`);
-    if (_devHint) {
-      console.log(`    ★  ${_devHint}`);
-    }
+    if (_devHint) console.log(`    ★  ${_devHint}`);
     console.log(border + '\n');
     logger.info(`[DEV EMAIL] to=${to} | ${subject}${_devHint ? ' | ' + _devHint : ''}`);
     return { devMode: true };
   }
 
-  logger.info(`[sendMail] Resend SEND START — from="${config.email.fromName}" <${config.email.fromAddress}>`);
-  try {
-    const { data, error } = await resend.emails.send({
-      from:    `${config.email.fromName} <${config.email.fromAddress}>`,
-      to:      [to],
-      subject,
-      html,
-      text:    text || html.replace(/<[^>]+>/g, ''),
-    });
-
-    if (error) {
-      logger.error(`[sendMail] Resend API error — to=${to} | name=${error.name} | message=${error.message}`);
-      const err = new Error(error.message || 'Resend API error');
-      err.name = error.name;
+  // ── SMTP send ─────────────────────────────────────────────────────────────────
+  if (EMAIL_PROVIDER === 'smtp') {
+    const fromString = `"${config.email.fromName}" <${config.email.fromAddress}>`;
+    logger.info(`[sendMail] SMTP SEND — from=${fromString}`);
+    try {
+      const info = await _transporter.sendMail({
+        from:    fromString,
+        to,
+        subject,
+        html,
+        text:    text || html.replace(/<[^>]+>/g, ''),
+      });
+      logger.info(`[sendMail] SMTP SENT — messageId=${info.messageId}`);
+      return { messageId: info.messageId };
+    } catch (err) {
+      // Log without exposing credentials
+      logger.error(`[sendMail] SMTP FAILED — to=${to} | message=${err.message}`);
       throw err;
     }
-
-    logger.info(`[sendMail] Resend SEND RESULT — id=${data.id}`);
-    // Return shape compatible with existing callers that read mailResult.messageId
-    return { messageId: data.id };
-  } catch (err) {
-    logger.error(`[sendMail] Resend SEND FAILED — to=${to} | message=${err.message}`);
-    throw err;
   }
+
+  // ── Resend send ───────────────────────────────────────────────────────────────
+  if (EMAIL_PROVIDER === 'resend') {
+    logger.info(`[sendMail] Resend SEND — from="${config.email.fromName}" <${config.email.fromAddress}>`);
+    try {
+      const resend = getResendClient();
+      const { data, error } = await resend.emails.send({
+        from:    `${config.email.fromName} <${config.email.fromAddress}>`,
+        to:      [to],
+        subject,
+        html,
+        text:    text || html.replace(/<[^>]+>/g, ''),
+      });
+      if (error) {
+        logger.error(`[sendMail] Resend API error — to=${to} | name=${error.name} | message=${error.message}`);
+        const err = new Error(error.message || 'Resend API error');
+        err.name = error.name;
+        throw err;
+      }
+      logger.info(`[sendMail] Resend SENT — id=${data.id}`);
+      return { messageId: data.id };
+    } catch (err) {
+      logger.error(`[sendMail] Resend FAILED — to=${to} | message=${err.message}`);
+      throw err;
+    }
+  }
+
+  // Should never reach here
+  throw new Error(`[sendMail] Unknown EMAIL_PROVIDER: ${EMAIL_PROVIDER}`);
 }
 
-// ── Shared layout ──────────────────────────────────────────────────────────────
+// ── Shared layout ───────────────────────────────────────────────────────────────
 function emailLayout(content) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -159,7 +240,7 @@ function emailLayout(content) {
 </html>`;
 }
 
-// ── Email Verification ─────────────────────────────────────────────────────────
+// ── Email Verification ──────────────────────────────────────────────────────────
 function verifyEmailTemplate(name, verifyUrl) {
   return {
     subject: '✉️ Verify your Smart Manufacturing ERP email',
@@ -186,7 +267,7 @@ function verifyEmailTemplate(name, verifyUrl) {
   };
 }
 
-// ── Forgot Password ────────────────────────────────────────────────────────────
+// ── Forgot Password ─────────────────────────────────────────────────────────────
 function resetPasswordTemplate(name, resetUrl) {
   return {
     subject: '🔐 Reset your Smart Manufacturing ERP password',
@@ -214,7 +295,7 @@ function resetPasswordTemplate(name, resetUrl) {
   };
 }
 
-// ── OTP Verification ───────────────────────────────────────────────────────────
+// ── OTP Verification ────────────────────────────────────────────────────────────
 function otpTemplate(name, otp) {
   return {
     subject: '🔑 Your Smart Manufacturing ERP verification code',
@@ -238,7 +319,7 @@ function otpTemplate(name, otp) {
   };
 }
 
-// ── Account Created ────────────────────────────────────────────────────────────
+// ── Account Created ─────────────────────────────────────────────────────────────
 function accountCreatedTemplate(name, email, role, verifyUrl) {
   return {
     subject: '🎉 Welcome to Smart Manufacturing ERP',
@@ -265,7 +346,7 @@ function accountCreatedTemplate(name, email, role, verifyUrl) {
   };
 }
 
-// ── Password Changed Confirmation ──────────────────────────────────────────────
+// ── Password Changed Confirmation ───────────────────────────────────────────────
 function passwordChangedTemplate(name) {
   const time = new Date().toLocaleString('en-US', {
     dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC',
@@ -293,8 +374,8 @@ function passwordChangedTemplate(name) {
 module.exports = {
   IS_DEV_EMAIL,
   sendMail,
-  verifySmtpConnection,   // backward-compat alias (used in server.js)
-  verifyEmailConnection,
+  verifySmtpConnection,    // primary name (used in server.js)
+  verifyEmailConnection,   // alias
   verifyEmailTemplate,
   resetPasswordTemplate,
   otpTemplate,
