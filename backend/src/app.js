@@ -42,11 +42,24 @@ const app = express();
 app.use(helmet());
 
 // ── CORS ───────────────────────────────────────────────────────────────────────
+// config.cors.origins  — exact origins from CORS_ORIGINS env var (comma-separated)
+// CORS_ORIGIN_PATTERNS — optional comma-separated JS-regex strings for wildcard
+//   matching, e.g. "https://.*\\.vercel\\.app$" to allow all Vercel preview URLs.
+const _corsPatterns = (process.env.CORS_ORIGIN_PATTERNS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
+  .map(s => new RegExp(s));
+
 app.use(cors({
   origin(origin, cb) {
     // Allow requests with no origin (e.g. mobile apps, curl, Postman)
     if (!origin) return cb(null, true);
+    // Exact match against CORS_ORIGINS list
     if (config.cors.origins.includes(origin)) return cb(null, true);
+    // Pattern match against CORS_ORIGIN_PATTERNS list
+    if (_corsPatterns.some(re => re.test(origin))) return cb(null, true);
+    logger.warn(`[CORS] blocked origin: ${origin}`);
     cb(new Error(`CORS: origin '${origin}' not allowed.`));
   },
   credentials: true,
